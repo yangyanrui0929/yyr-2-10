@@ -51,8 +51,11 @@ class UndergroundRadioGame {
                 broadcastDone: false,
                 qaDone: 0,
                 repairDone: [],
-                rumorSuppressDone: []
+                rumorSuppressDone: [],
+                scanDone: 0
             },
+            signals: [],
+            signalHistory: [],
             gameOver: false
         };
     }
@@ -138,6 +141,7 @@ class UndergroundRadioGame {
         document.getElementById('doBroadcastBtn').addEventListener('click', () => this.doBroadcast());
         document.getElementById('doRepairBtn').addEventListener('click', () => this.doRepair());
         document.getElementById('suppressRumorBtn').addEventListener('click', () => this.suppressRumor());
+        document.getElementById('doScanBtn').addEventListener('click', () => this.doScan());
 
         ['power', 'noise', 'rumor', 'fatigue', 'morale'].forEach(stat => {
             const slider = document.getElementById(stat + 'ThresholdSlider');
@@ -173,6 +177,7 @@ class UndergroundRadioGame {
         this.renderBroadcasts();
         this.renderEquipment();
         this.renderRumors();
+        this.renderSignals();
         this.renderSettlements();
         this.renderThresholds();
     }
@@ -411,6 +416,145 @@ class UndergroundRadioGame {
         });
 
         document.getElementById('suppressRumorBtn').disabled = select.options.length === 0;
+    }
+
+    renderSignals() {
+        const container = document.getElementById('signalList');
+        const historyContainer = document.getElementById('signalHistory');
+        const scanBtn = document.getElementById('doScanBtn');
+        const scanCountSpan = document.getElementById('scanCount');
+        const config = GameData.scanConfig;
+
+        scanCountSpan.textContent = `${this.gameState.todayActions.scanDone}/${config.maxScansPerDay}`;
+        scanBtn.disabled = this.gameState.todayActions.scanDone >= config.maxScansPerDay || 
+                           this.gameState.status.power < config.basePowerCost;
+
+        container.innerHTML = '';
+        
+        if (this.gameState.signals.length === 0) {
+            container.innerHTML = '<p style="color:#888; text-align:center; padding:40px">暂无捕获的信号，点击上方按钮开始扫描</p>';
+        } else {
+            const sortedSignals = [...this.gameState.signals].sort((a, b) => {
+                if (a.status === 'pending' && b.status !== 'pending') return -1;
+                if (a.status !== 'pending' && b.status === 'pending') return 1;
+                return b.clarity - a.clarity;
+            });
+
+            sortedSignals.forEach(signal => {
+                const item = document.createElement('div');
+                item.className = 'signal-card';
+                
+                const riskInfo = this.getRiskLevel(signal.risk);
+                const daysLeft = signal.expiresIn - (this.gameState.day - signal.dayFound);
+                const isExpiring = daysLeft <= 1;
+                const isExpired = daysLeft <= 0;
+
+                let statusBadge = '';
+                if (signal.status === 'pending') {
+                    statusBadge = `<span class="signal-status pending">待解码</span>`;
+                } else if (signal.status === 'decoded') {
+                    statusBadge = `<span class="signal-status decoded">已解码</span>`;
+                }
+
+                if (isExpired) {
+                    item.classList.add('expired');
+                } else if (isExpiring) {
+                    item.classList.add('expiring');
+                }
+
+                item.innerHTML = `
+                    <div class="signal-header">
+                        <span class="signal-icon">${signal.icon}</span>
+                        <div class="signal-title">
+                            <div class="signal-name">${signal.name} ${statusBadge}</div>
+                            <div class="signal-freq">📻 ${signal.frequency}</div>
+                        </div>
+                        <span class="signal-risk ${riskInfo.class}">${riskInfo.level}风险</span>
+                    </div>
+                    <div class="signal-desc">${signal.description}</div>
+                    <div class="signal-stats">
+                        <div class="signal-stat">
+                            <span>清晰度</span>
+                            <div class="signal-stat-bar">
+                                <div class="signal-stat-fill clarity" style="width:${signal.clarity}%"></div>
+                            </div>
+                            <span>${signal.clarity}%</span>
+                        </div>
+                        <div class="signal-stat">
+                            <span>解码难度</span>
+                            <div class="signal-stat-bar">
+                                <div class="signal-stat-fill difficulty" style="width:${signal.difficulty}%"></div>
+                            </div>
+                            <span>${signal.difficulty}%</span>
+                        </div>
+                    </div>
+                    <div class="signal-footer">
+                        <span class="signal-expire ${isExpiring ? 'warning' : ''}">
+                            ${isExpired ? '已过期' : `🕒 ${daysLeft} 天后过期`}
+                        </span>
+                        <div class="signal-actions">
+                            ${signal.status === 'pending' && !isExpired ? 
+                                `<button class="btn btn-small btn-primary" data-action="decode" data-id="${signal.id}">🔓 解码</button>` : ''}
+                            ${signal.status === 'decoded' && !isExpired ? 
+                                `<button class="btn btn-small btn-success" data-action="rebroadcast" data-id="${signal.id}">📢 转播</button>` : ''}
+                            ${!isExpired ? 
+                                `<button class="btn btn-small btn-secondary" data-action="seal" data-id="${signal.id}">🔒 封存</button>` : ''}
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(item);
+            });
+
+            container.querySelectorAll('button[data-action]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const action = e.target.dataset.action;
+                    const id = e.target.dataset.id;
+                    if (action === 'decode') this.decodeSignal(id);
+                    else if (action === 'rebroadcast') this.rebroadcastSignal(id);
+                    else if (action === 'seal') this.sealSignal(id);
+                });
+            });
+        }
+
+        if (historyContainer) {
+            historyContainer.innerHTML = '';
+            const recentHistory = this.gameState.signalHistory.slice().reverse().slice(0, 10);
+            
+            if (recentHistory.length === 0) {
+                historyContainer.innerHTML = '<p style="color:#666; text-align:center; padding:20px; font-size:12px">暂无历史记录</p>';
+            } else {
+                recentHistory.forEach(record => {
+                    const item = document.createElement('div');
+                    item.className = 'signal-history-item';
+                    
+                    let actionText = '';
+                    let actionClass = '';
+                    switch(record.action) {
+                        case 'decode':
+                            actionText = record.success ? '解码成功' : '解码失败';
+                            actionClass = record.success ? 'action-success' : 'action-fail';
+                            break;
+                        case 'rebroadcast':
+                            actionText = '已转播';
+                            actionClass = 'action-rebroadcast';
+                            break;
+                        case 'seal':
+                            actionText = '已封存';
+                            actionClass = 'action-seal';
+                            break;
+                    }
+
+                    item.innerHTML = `
+                        <span class="history-icon">${record.icon}</span>
+                        <span class="history-name">${record.name}</span>
+                        <span class="history-action ${actionClass}">${actionText}</span>
+                        <span class="history-day">第${record.day}天</span>
+                    `;
+                    historyContainer.appendChild(item);
+                });
+            }
+        }
     }
 
     renderSettlements() {
@@ -655,6 +799,273 @@ class UndergroundRadioGame {
         this.renderAll();
     }
 
+    generateSignal() {
+        const signalTypes = GameData.signalTypes;
+        const weights = [15, 12, 10, 18, 25, 5, 10, 5];
+        const totalWeight = weights.reduce((a, b) => a + b, 0);
+        let random = Math.random() * totalWeight;
+        let selectedIndex = 0;
+        
+        for (let i = 0; i < weights.length; i++) {
+            random -= weights[i];
+            if (random <= 0) {
+                selectedIndex = i;
+                break;
+            }
+        }
+
+        const type = signalTypes[selectedIndex];
+        const equipment = this.gameState.equipment;
+        
+        let clarityBonus = 0;
+        let riskReduction = 0;
+        
+        const antenna = equipment.find(e => e.id === 'antenna');
+        const transmitter = equipment.find(e => e.id === 'transmitter');
+        const mixer = equipment.find(e => e.id === 'mixer');
+        
+        if (antenna && antenna.condition > 30) {
+            clarityBonus += (antenna.condition / 100) * 15;
+        }
+        if (mixer && mixer.condition > 30) {
+            clarityBonus += (mixer.condition / 100) * 10;
+        }
+        if (transmitter && transmitter.condition > 30) {
+            riskReduction += (transmitter.condition / 100) * 10;
+        }
+
+        const clarityVariation = (Math.random() - 0.5) * 20;
+        const clarity = Math.max(5, Math.min(95, type.baseClarity + clarityBonus + clarityVariation));
+        const difficulty = Math.max(10, Math.min(95, type.baseDifficulty + (Math.random() - 0.5) * 15));
+        const risk = Math.max(0, Math.min(100, type.baseRisk - riskReduction + (Math.random() - 0.5) * 10));
+
+        return {
+            id: 'signal_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+            typeId: type.id,
+            name: type.name,
+            icon: type.icon,
+            description: type.description,
+            clarity: Math.round(clarity),
+            difficulty: Math.round(difficulty),
+            risk: Math.round(risk),
+            expiresIn: type.expiresIn,
+            dayFound: this.gameState.day,
+            status: 'pending',
+            decodeEffects: type.decodeEffects,
+            rebroadcastEffects: type.rebroadcastEffects,
+            sealEffects: type.sealEffects,
+            frequency: this.generateFrequency()
+        };
+    }
+
+    generateFrequency() {
+        const bands = ['AM', 'FM', 'SW', 'HF', 'VHF'];
+        const band = bands[Math.floor(Math.random() * bands.length)];
+        let freq;
+        switch(band) {
+            case 'AM':
+                freq = (530 + Math.random() * 1000).toFixed(0) + ' kHz';
+                break;
+            case 'FM':
+                freq = (88 + Math.random() * 20).toFixed(1) + ' MHz';
+                break;
+            case 'SW':
+                freq = (3 + Math.random() * 27).toFixed(1) + ' MHz';
+                break;
+            case 'HF':
+                freq = (3 + Math.random() * 27).toFixed(1) + ' MHz';
+                break;
+            case 'VHF':
+                freq = (30 + Math.random() * 270).toFixed(0) + ' MHz';
+                break;
+        }
+        return `${band} ${freq}`;
+    }
+
+    doScan() {
+        const config = GameData.scanConfig;
+        
+        if (this.gameState.todayActions.scanDone >= config.maxScansPerDay) {
+            this.showEvent('扫描次数已用完', '今日频段扫描次数已达上限，请明日再试。', [{ text: '📡 扫描次数耗尽', type: 'negative' }]);
+            return;
+        }
+
+        if (this.gameState.status.power < config.basePowerCost) {
+            this.showEvent('电力不足', '电量不足，无法进行频段扫描！', [{ text: '⚡电量不足', type: 'negative' }]);
+            return;
+        }
+
+        this.gameState.status.power -= config.basePowerCost;
+        this.gameState.status.fatigue += 5;
+        this.gameState.todayActions.scanDone++;
+
+        const antenna = this.gameState.equipment.find(e => e.id === 'antenna');
+        let signalCount = config.baseSignalCount;
+        if (antenna && antenna.condition > 50) {
+            signalCount += Math.floor(antenna.condition / 50);
+        }
+
+        const newSignals = [];
+        for (let i = 0; i < signalCount; i++) {
+            const signal = this.generateSignal();
+            newSignals.push(signal);
+            this.gameState.signals.push(signal);
+        }
+
+        const effectTags = [
+            { text: `⚡ 电力 -${config.basePowerCost}`, type: 'negative' },
+            { text: `😴 疲劳 +5`, type: 'negative' },
+            { text: `📡 发现 ${signalCount} 个信号`, type: 'positive' }
+        ];
+
+        const signalNames = newSignals.map(s => `${s.icon} ${s.name}`).join('、');
+        this.showEvent('频段扫描完成', `扫描完成，发现以下信号：${signalNames}`, effectTags);
+        this.renderAll();
+    }
+
+    decodeSignal(signalId) {
+        const signal = this.gameState.signals.find(s => s.id === signalId);
+        if (!signal || signal.status !== 'pending') return;
+
+        const survivor = this.gameState.survivors.find(s => s.skill === '通讯' && !s.task);
+        
+        let decodeChance = signal.clarity - signal.difficulty + 30;
+        if (survivor) {
+            decodeChance += 25;
+        }
+        decodeChance = Math.max(10, Math.min(95, decodeChance));
+
+        const success = Math.random() * 100 < decodeChance;
+        const fatigueCost = survivor ? 10 : 15;
+
+        this.gameState.status.fatigue += fatigueCost;
+        if (survivor) {
+            survivor.fatigue += 15;
+            survivor.task = `解码 ${signal.name}`;
+        }
+
+        if (success) {
+            signal.status = 'decoded';
+            this.applyEffects(signal.decodeEffects);
+            
+            const effectTags = Object.entries(signal.decodeEffects)
+                .filter(([_, v]) => v !== 0)
+                .map(([k, v]) => ({
+                    text: `${this.getStatName(k)} ${v > 0 ? '+' : ''}${v}`,
+                    type: v > 0 ? 'positive' : 'negative'
+                }));
+            effectTags.unshift({ text: '✅ 解码成功', type: 'positive' });
+
+            this.gameState.signalHistory.push({
+                ...signal,
+                action: 'decode',
+                day: this.gameState.day,
+                success: true
+            });
+
+            this.showEvent('信号解码成功', `成功解码了"${signal.name}"信号！`, effectTags);
+        } else {
+            const damage = Math.floor(Math.random() * 10) + 5;
+            this.gameState.status.power -= damage;
+            
+            const effectTags = [
+                { text: '❌ 解码失败', type: 'negative' },
+                { text: `⚡ 电力 -${damage}`, type: 'negative' }
+            ];
+
+            this.gameState.signalHistory.push({
+                ...signal,
+                action: 'decode',
+                day: this.gameState.day,
+                success: false
+            });
+
+            this.showEvent('信号解码失败', `尝试解码"${signal.name}"信号失败，设备受损。`, effectTags);
+        }
+
+        this.renderAll();
+    }
+
+    rebroadcastSignal(signalId) {
+        const signal = this.gameState.signals.find(s => s.id === signalId);
+        if (!signal || signal.status !== 'decoded') return;
+
+        if (this.gameState.status.power < 15) {
+            this.showEvent('电力不足', '电量不足，无法进行转播！', [{ text: '⚡电量不足', type: 'negative' }]);
+            return;
+        }
+
+        this.gameState.status.power -= 15;
+        this.gameState.status.fatigue += 8;
+        signal.status = 'rebroadcast';
+
+        this.applyEffects(signal.rebroadcastEffects);
+
+        const effectTags = Object.entries(signal.rebroadcastEffects)
+            .filter(([_, v]) => v !== 0)
+            .map(([k, v]) => ({
+                text: `${this.getStatName(k)} ${v > 0 ? '+' : ''}${v}`,
+                type: v > 0 ? 'positive' : 'negative'
+            }));
+        effectTags.unshift({ text: '📢 信号已转播', type: 'positive' });
+
+        if (signal.risk >= 60 && Math.random() < 0.3) {
+            const extraRumor = Math.floor(Math.random() * 15) + 5;
+            this.gameState.status.rumor += extraRumor;
+            effectTags.push({ text: `⚠️ 高风险信号引发关注 🗣️+${extraRumor}`, type: 'negative' });
+        }
+
+        this.gameState.signalHistory.push({
+            ...signal,
+            action: 'rebroadcast',
+            day: this.gameState.day
+        });
+
+        this.gameState.signals = this.gameState.signals.filter(s => s.id !== signalId);
+
+        this.showEvent('信号转播完成', `已转播"${signal.name}"信号内容。`, effectTags);
+        this.renderAll();
+    }
+
+    sealSignal(signalId) {
+        const signal = this.gameState.signals.find(s => s.id === signalId);
+        if (!signal) return;
+
+        signal.status = 'sealed';
+        this.applyEffects(signal.sealEffects);
+
+        const effectTags = Object.entries(signal.sealEffects)
+            .filter(([_, v]) => v !== 0)
+            .map(([k, v]) => ({
+                text: `${this.getStatName(k)} ${v > 0 ? '+' : ''}${v}`,
+                type: v > 0 ? 'positive' : 'negative'
+            }));
+
+        if (effectTags.length === 0) {
+            effectTags.push({ text: '🔒 信号已封存', type: 'neutral' });
+        } else {
+            effectTags.unshift({ text: '🔒 信号已封存', type: 'neutral' });
+        }
+
+        this.gameState.signalHistory.push({
+            ...signal,
+            action: 'seal',
+            day: this.gameState.day
+        });
+
+        this.gameState.signals = this.gameState.signals.filter(s => s.id !== signalId);
+
+        this.showEvent('信号已封存', `"${signal.name}"信号已被封存记录。`, effectTags);
+        this.renderAll();
+    }
+
+    getRiskLevel(risk) {
+        if (risk < 25) return { level: '低', class: 'risk-low' };
+        if (risk < 50) return { level: '中', class: 'risk-medium' };
+        if (risk < 75) return { level: '高', class: 'risk-high' };
+        return { level: '极高', class: 'risk-extreme' };
+    }
+
     applyEffects(effects) {
         Object.entries(effects).forEach(([key, value]) => {
             if (key === 'trust') {
@@ -785,8 +1196,26 @@ class UndergroundRadioGame {
             broadcastDone: false,
             qaDone: 0,
             repairDone: [],
-            rumorSuppressDone: []
+            rumorSuppressDone: [],
+            scanDone: 0
         };
+
+        const expiredSignals = this.gameState.signals.filter(s => 
+            (this.gameState.day - s.dayFound) >= s.expiresIn
+        );
+        if (expiredSignals.length > 0) {
+            expiredSignals.forEach(s => {
+                this.gameState.signalHistory.push({
+                    ...s,
+                    action: 'expired',
+                    day: this.gameState.day,
+                    success: false
+                });
+            });
+        }
+        this.gameState.signals = this.gameState.signals.filter(s => 
+            (this.gameState.day - s.dayFound) < s.expiresIn
+        );
 
         this.generateDailyRumors();
 

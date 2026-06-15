@@ -124,5 +124,123 @@ const GameData = {
     ],
 
     survivorNames: ['李明', '王芳', '张伟', '刘洋', '陈静', '杨帆', '赵磊', '周婷', '吴强', '郑雪'],
-    survivorSkills: ['维修', '医疗', '电力', '通讯', '搜索']
+    survivorSkills: ['维修', '医疗', '电力', '通讯', '搜索'],
+
+    signalTypes: [
+        {
+            id: 'rescue_coord',
+            name: '救援队坐标',
+            icon: '🚁',
+            description: '疑似救援队的坐标信号',
+            baseClarity: 40,
+            baseDifficulty: 60,
+            baseRisk: 30,
+            expiresIn: 2,
+            decodeEffects: { morale: 20, trust: 15, rumor: -10 },
+            rebroadcastEffects: { morale: 25, trust: 20, rumor: -15, noise: 10 },
+            sealEffects: {}
+        },
+        {
+            id: 'fake_notice',
+            name: '伪装通知',
+            icon: '📋',
+            description: '看似官方通知的可疑信号',
+            baseClarity: 70,
+            baseDifficulty: 40,
+            baseRisk: 50,
+            expiresIn: 3,
+            decodeEffects: { rumor: 15, trust: -10, morale: -5 },
+            rebroadcastEffects: { rumor: 25, trust: -20, morale: -15, noise: 15 },
+            sealEffects: { rumor: 5 }
+        },
+        {
+            id: 'black_market',
+            name: '黑市交易',
+            icon: '💰',
+            description: '地下黑市的交易频率',
+            baseClarity: 50,
+            baseDifficulty: 70,
+            baseRisk: 60,
+            expiresIn: 1,
+            decodeEffects: { parts: 3, battery: 2, rumor: 10 },
+            rebroadcastEffects: { parts: 5, battery: 3, rumor: 20, trust: -15 },
+            sealEffects: {}
+        },
+        {
+            id: 'private_distress',
+            name: '私人求救',
+            icon: '🆘',
+            description: '微弱的个人求救信号',
+            baseClarity: 30,
+            baseDifficulty: 50,
+            baseRisk: 20,
+            expiresIn: 1,
+            decodeEffects: { morale: 10, trust: 10, food: 2 },
+            rebroadcastEffects: { morale: 15, trust: 15, food: 5, noise: 8 },
+            sealEffects: { morale: -5 }
+        },
+        {
+            id: 'pure_noise',
+            name: '纯噪声',
+            icon: '📡',
+            description: '无意义的电磁噪声',
+            baseClarity: 10,
+            baseDifficulty: 20,
+            baseRisk: 5,
+            expiresIn: 1,
+            decodeEffects: { fatigue: 5 },
+            rebroadcastEffects: { noise: 20, fatigue: 10 },
+            sealEffects: {}
+        },
+        {
+            id: 'military_freq',
+            name: '军方频率',
+            icon: '🎖️',
+            description: '加密的军方通讯频率',
+            baseClarity: 25,
+            baseDifficulty: 85,
+            baseRisk: 75,
+            expiresIn: 2,
+            decodeEffects: { morale: 30, trust: 25, rumor: -20, parts: 5 },
+            rebroadcastEffects: { morale: 35, trust: 30, rumor: -25, noise: 20, parts: 8 },
+            sealEffects: { rumor: -5 }
+        },
+        {
+            id: 'pirate_radio',
+            name: '海盗电台',
+            icon: '🏴‍☠️',
+            description: '其他地下广播电台的信号',
+            baseClarity: 55,
+            baseDifficulty: 35,
+            baseRisk: 35,
+            expiresIn: 3,
+            decodeEffects: { morale: 5, rumor: 10, trust: -5 },
+            rebroadcastEffects: { morale: 8, rumor: 20, trust: -15, noise: 15 },
+            sealEffects: {}
+        },
+        {
+            id: 'supply_drop',
+            name: '空投坐标',
+            icon: '📦',
+            description: '物资空投的坐标信息',
+            baseClarity: 45,
+            baseDifficulty: 55,
+            baseRisk: 45,
+            expiresIn: 1,
+            decodeEffects: { food: 8, medicine: 2, battery: 3, morale: 15 },
+            rebroadcastEffects: { food: 5, medicine: 1, battery: 2, morale: 20, trust: 10, noise: 12 },
+            sealEffects: { morale: -3 }
+        }
+    ],
+
+    scanConfig: {
+        basePowerCost: 10,
+        maxScansPerDay: 5,
+        baseSignalCount: 1,
+        equipmentBonus: {
+            antenna: { clarity: 15, signalCount: 1 },
+            transmitter: { range: 20, risk: -10 },
+            mixer: { clarity: 10 }
+        }
+    }
 };

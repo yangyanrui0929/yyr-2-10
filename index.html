@@ -87,6 +87,7 @@
                 <div class="tab-buttons">
                     <button class="tab-btn active" data-tab="schedule">📅 节目编排</button>
                     <button class="tab-btn" data-tab="broadcast">📢 播报消息</button>
+                    <button class="tab-btn" data-tab="scan">📡 频段扫描</button>
                     <button class="tab-btn" data-tab="qa">❓ 听众问答</button>
                     <button class="tab-btn" data-tab="repair">🔧 设备维修</button>
                     <button class="tab-btn" data-tab="rumor">🚫 谣言压制</button>
@@ -126,6 +127,21 @@
                             <p>请选择要播报的消息...</p>
                         </div>
                         <button id="doBroadcastBtn" class="btn btn-primary" disabled>开始播报</button>
+                    </div>
+
+                    <div id="scan" class="tab-pane">
+                        <div class="scan-header">
+                            <h3>📡 频段扫描</h3>
+                            <div class="scan-controls">
+                                <span class="scan-count">今日扫描: <strong id="scanCount">0/5</strong></span>
+                                <button id="doScanBtn" class="btn btn-primary">⚡ 开始扫描 (耗电10)</button>
+                            </div>
+                        </div>
+                        <div class="signal-list" id="signalList"></div>
+                        <div class="signal-history-section">
+                            <h4>📜 信号处理记录</h4>
+                            <div class="signal-history" id="signalHistory"></div>
+                        </div>
                     </div>
 
                     <div id="qa" class="tab-pane">
