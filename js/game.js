@@ -103,14 +103,63 @@ class UndergroundRadioGame {
         this.showEvent('游戏已保存', '你的游戏进度已保存到本地存储。', []);
     }
 
+    migrateGameState(state) {
+        const defaultState = this.getDefaultState();
+
+        if (!state.status) state.status = defaultState.status;
+        if (!state.thresholds) state.thresholds = defaultState.thresholds;
+        if (!state.resources) state.resources = defaultState.resources;
+        if (!state.survivors) state.survivors = defaultState.survivors;
+        if (!state.equipment) state.equipment = defaultState.equipment;
+        if (!state.districts) state.districts = defaultState.districts;
+        if (!state.schedule) state.schedule = defaultState.schedule;
+        if (!state.rumors) state.rumors = [];
+        if (!state.settlementHistory) state.settlementHistory = [];
+        if (!state.answeredQuestions) state.answeredQuestions = [];
+
+        if (!state.todayActions) {
+            state.todayActions = defaultState.todayActions;
+        } else {
+            if (state.todayActions.scanDone === undefined) {
+                state.todayActions.scanDone = 0;
+            }
+            if (state.todayActions.broadcastDone === undefined) {
+                state.todayActions.broadcastDone = false;
+            }
+            if (state.todayActions.qaDone === undefined) {
+                state.todayActions.qaDone = 0;
+            }
+            if (!state.todayActions.repairDone) {
+                state.todayActions.repairDone = [];
+            }
+            if (!state.todayActions.rumorSuppressDone) {
+                state.todayActions.rumorSuppressDone = [];
+            }
+        }
+
+        if (!state.signals) state.signals = [];
+        if (!state.signalHistory) state.signalHistory = [];
+
+        if (state.gameOver === undefined) state.gameOver = false;
+        if (state.day === undefined) state.day = 1;
+        if (state.selectedBroadcast === undefined) state.selectedBroadcast = null;
+        if (state.currentQuestion === undefined) state.currentQuestion = null;
+
+        return state;
+    }
+
     loadGame() {
         const saved = localStorage.getItem('undergroundRadioSave');
         if (saved) {
             try {
-                this.gameState = JSON.parse(saved);
+                let loadedState = JSON.parse(saved);
+                loadedState = this.migrateGameState(loadedState);
+                this.gameState = loadedState;
                 this.showEvent('读取存档', '成功读取游戏存档！', []);
             } catch (e) {
+                console.error('读取存档失败，使用默认状态：', e);
                 this.gameState = this.getDefaultState();
+                this.generateDailyRumors();
             }
         } else {
             this.gameState = this.getDefaultState();
@@ -543,6 +592,13 @@ class UndergroundRadioGame {
                             actionText = '已封存';
                             actionClass = 'action-seal';
                             break;
+                        case 'expired':
+                            actionText = '已过期';
+                            actionClass = 'action-expired';
+                            break;
+                        default:
+                            actionText = '未知';
+                            actionClass = 'action-seal';
                     }
 
                     item.innerHTML = `

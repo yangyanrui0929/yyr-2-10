@@ -1137,6 +1137,13 @@ body {
     color: #95a5a6;
 }
 
+.action-expired {
+    background: rgba(127, 140, 141, 0.25);
+    color: #7f8c8d;
+    text-decoration: line-through;
+    opacity: 0.8;
+}
+
 .history-day {
     color: #666;
     font-size: 11px;
